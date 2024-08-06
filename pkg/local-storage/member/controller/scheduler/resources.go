@@ -187,7 +187,7 @@ func (r *resources) initilizeResources() {
 }
 
 // poolname -> volumes
-func (r *resources) getAssociatedVolumes(vol *apisv1alpha1.LocalVolume) map[string][]*apisv1alpha1.LocalVolume {
+func (r *resources) getUnboudAssociatedVolumes(vol *apisv1alpha1.LocalVolume) map[string][]*apisv1alpha1.LocalVolume {
 	lvs := map[string][]*apisv1alpha1.LocalVolume{}
 	pvcs := []string{}
 
@@ -239,6 +239,12 @@ func (r *resources) getAssociatedVolumes(vol *apisv1alpha1.LocalVolume) map[stri
 			r.cachePVC(pvcInCluster)
 			pvc = pvcInCluster
 		}
+
+		//Filter the bound pvc
+		if pvc.Status.Phase == "Bound" {
+			continue
+		}
+
 		sc, exists := r.scsMap[*pvc.Spec.StorageClassName]
 		if !exists || sc == nil {
 			r.logger.WithField("sc", sc.Name).Debugf("not found in the map")
@@ -247,7 +253,7 @@ func (r *resources) getAssociatedVolumes(vol *apisv1alpha1.LocalVolume) map[stri
 
 		poolName, err := utils.BuildStoragePoolName(
 			sc.Parameters[apisv1alpha1.VolumeParameterPoolClassKey],
-			)
+		)
 		if err != nil {
 			r.logger.WithError(err).Errorf("build storagepoolname err")
 			return lvs
@@ -276,7 +282,7 @@ func (r *resources) predicate(vol *apisv1alpha1.LocalVolume, nodeName string) er
 		return fmt.Errorf("storage node %s not exists", nodeName)
 	}
 
-	vols := r.getAssociatedVolumes(vol)
+	vols := r.getUnboudAssociatedVolumes(vol)
 	if len(vols) == 0 {
 		r.logger.Error("Not found associated volumes")
 		return fmt.Errorf("not found associated volumes")
@@ -331,7 +337,7 @@ func (r *resources) score(vol *apisv1alpha1.LocalVolume, nodeName string) (int64
 	}
 
 	var score int64 = 0
-	vols := r.getAssociatedVolumes(vol)
+	vols := r.getUnboudAssociatedVolumes(vol)
 	if len(vols) == 0 {
 		r.logger.Error("Not found associated volumes")
 		return 0, fmt.Errorf("not found associated volumes")
